@@ -30,7 +30,6 @@ ProvenCryptoOneAPIExt = "oneAPI"
 ProvenCryptoSMTExt = "SMTLib"
 
 [compat]
-[compat]
 Dates = "1.11.0"
 JSON = "1.4.0"
 SHA = "0.7, 1"

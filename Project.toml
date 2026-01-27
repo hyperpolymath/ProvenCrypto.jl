@@ -1,7 +1,7 @@
 name = "ProvenCrypto"
 uuid = "33678010-b125-405f-b046-d17447b3c4c1"
 authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]
-version = "0.1.1"  # Bumped version to reflect fixes and improvements
+version = "0.1.1"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -14,16 +14,13 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [weakdeps]
 # GPU/accelerator backends (optional, non-proprietary)
-AMDGPU = "21141c5e-07a7-4f66-8537-7165297b8987"  # ROCm/AMDGPU support
-CUDA = "052768ef-5323-5732-b1bb-66c8b6480fd0"    # NVIDIA CUDA support (user must opt-in)
-Metal = "dde4c033-4e86-420c-a63e-0dd931031962"   # Apple Metal support
-oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"  # Intel oneAPI support
-
-# Formal methods (optional)
-SMTLib = "7d3f9a2c-8b4e-5c1f-a6d0-9e8f7b2c3d4e"  # SMT solver integration
+AMDGPU = "21141c5e-07a7-4f66-8537-7165297b8987"
+CUDA = "052768ef-5323-5732-b1bb-66c8b6480fd0"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
+SMTLib = "7d3f9a2c-8b4e-5c1f-a6d0-9e8f7b2c3d4e"
 
 [extensions]
-# Extensions for optional hardware backends
 ProvenCryptoAMDGPUExt = ["AMDGPU"]
 ProvenCryptoCUDAExt = ["CUDA"]
 ProvenCryptoMetalExt = ["Metal"]
@@ -33,8 +30,8 @@ ProvenCryptoSMTExt = ["SMTLib"]
 [compat]
 Dates = "1.11.0"
 JSON = "1.4.0"
-SHA = "0.7, 1"  # Supports both SHA 0.7 and 1.x for compatibility
-julia = "1.9"   # Aligns with your ReScript/Hypatia stack
+SHA = "0.7, 1"
+julia = "1.9"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

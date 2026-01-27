@@ -11,6 +11,7 @@ Supports:
 - FPGA (OpenCL)
 - CPU SIMD (AVX2, AVX-512, NEON, SVE)
 """
+__precompile__(false)
 
 abstract type AbstractCryptoBackend end
 

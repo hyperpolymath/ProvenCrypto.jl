@@ -11,7 +11,6 @@ Supports:
 - FPGA (OpenCL)
 - CPU SIMD (AVX2, AVX-512, NEON, SVE)
 """
-__precompile__(false)
 
 abstract type AbstractCryptoBackend end
 
@@ -49,20 +48,44 @@ struct TPUBackend <: AbstractCryptoBackend
     topology::String
 end
 
-# Conditional backend availability (defined by package extensions)
-function cuda_available() end
-function rocm_available() end
-function metal_available() end
-function oneapi_available() end
-function tpu_available() end
+# --- Backend Availability Detection ---
+# Default implementations (overridden by package extensions)
+"""
+    cuda_available() -> Bool
 
-# Default implementations (overridden by extensions)
+Check if CUDA is available. Override in extensions.
+"""
 cuda_available() = false
+
+"""
+    rocm_available() -> Bool
+
+Check if ROCm is available. Override in extensions.
+"""
 rocm_available() = false
+
+"""
+    metal_available() -> Bool
+
+Check if Metal is available. Override in extensions.
+"""
 metal_available() = false
+
+"""
+    oneapi_available() -> Bool
+
+Check if oneAPI is available. Override in extensions.
+"""
 oneapi_available() = false
+
+"""
+    tpu_available() -> Bool
+
+Check if TPU is available. Override in extensions.
+"""
 tpu_available() = false
 
+# --- Hardware Detection Utilities ---
 """
     detect_simd_level() -> Symbol
 
@@ -70,21 +93,16 @@ Detect CPU SIMD instruction set support.
 Returns highest available: :avx512, :avx2, :avx, :sse, :neon, :sve, :none
 """
 function detect_simd_level()
-    # Platform-specific detection
     if Sys.isapple() && Sys.ARCH === :aarch64
-        # Apple Silicon always has NEON
-        return :neon
+        return :neon  # Apple Silicon always has NEON
     elseif Sys.ARCH === :aarch64
-        # Check for SVE on ARM
         if haskey(ENV, "JULIA_CPU_TARGET") && occursin("sve", ENV["JULIA_CPU_TARGET"])
             return :sve
         else
             return :neon
         end
     elseif Sys.ARCH === :x86_64
-        # x86-64 detection via cpuid
         try
-            # Julia's Sys.CPU_NAME contains flags
             cpu_info = lowercase(Sys.CPU_NAME)
             if occursin("avx512", cpu_info)
                 return :avx512
@@ -112,8 +130,6 @@ function detect_apple_silicon_generation()
     if !Sys.isapple() || Sys.ARCH !== :aarch64
         return 0
     end
-
-    # Try to detect via system_profiler
     try
         output = read(`system_profiler SPHardwareDataType`, String)
         if occursin("M4", output)
@@ -126,8 +142,7 @@ function detect_apple_silicon_generation()
             return 1
         end
     catch
-        # Fallback: assume M1 for Apple Silicon
-        return 1
+        return 1  # Fallback: assume M1
     end
     return 0
 end
@@ -136,110 +151,120 @@ end
     detect_hardware() -> AbstractCryptoBackend
 
 Auto-detect best available hardware backend for cryptography.
-
-Priority order:
-1. TPU (best for large lattice operations)
-2. CUDA with Tensor cores (NVIDIA A100, H100)
-3. Metal with Neural Engine (Apple Silicon M2+)
-4. oneAPI NPU (Intel Meteor Lake+)
-5. ROCm with Matrix cores (AMD MI series)
-6. CPU with highest SIMD level
+Priority order: TPU > CUDA > Metal > oneAPI > ROCm > CPU.
 """
 function detect_hardware()
-    # Try TPU first (best for post-quantum lattice crypto)
+    # TPU (highest priority)
     if tpu_available()
         try
-            # TPU detection via environment or API
             if haskey(ENV, "TPU_NAME")
-                return TPUBackend(4, ENV["TPU_NAME"])  # v4 TPU
+                return TPUBackend(4, ENV["TPU_NAME"])
             end
-        catch
+        catch e
+            @warn "TPU detection failed" exception=e
         end
     end
 
-    # Try CUDA (NVIDIA GPUs)
+    # CUDA
     if cuda_available()
         try
-            # Implemented in extension
-            return create_cuda_backend()
+            return CUDABackend(0, true, v"8.0")  # Placeholder; override in extension
         catch e
-            @warn "CUDA detected but initialization failed" exception=e
+            @warn "CUDA backend creation failed" exception=e
         end
     end
 
-    # Try Metal (Apple Silicon)
+    # Metal
     if metal_available()
         try
             gen = detect_apple_silicon_generation()
             has_ne = gen >= 2  # Neural Engine improved in M2+
             return MetalBackend(0, has_ne, gen)
         catch e
-            @warn "Metal detected but initialization failed" exception=e
+            @warn "Metal backend creation failed" exception=e
         end
     end
 
-    # Try oneAPI (Intel GPUs/NPUs)
+    # oneAPI
     if oneapi_available()
         try
-            return create_oneapi_backend()
+            return OneAPIBackend(0, false, :gpu)  # Placeholder; override in extension
         catch e
-            @warn "oneAPI detected but initialization failed" exception=e
+            @warn "oneAPI backend creation failed" exception=e
         end
     end
 
-    # Try ROCm (AMD GPUs)
+    # ROCm
     if rocm_available()
         try
-            return create_rocm_backend()
+            return ROCmBackend(0, false, "gfx900")  # Placeholder; override in extension
         catch e
-            @warn "ROCm detected but initialization failed" exception=e
+            @warn "ROCm backend creation failed" exception=e
         end
     end
 
-    # Fallback to CPU with SIMD detection
+    # Fallback to CPU
     simd = detect_simd_level()
     threads = Threads.nthreads()
-    CPUBackend(simd, threads)
+    return CPUBackend(simd, threads)
 end
 
-# Backend-specific operation dispatch (implemented in extensions or fallback to CPU)
-function backend_lattice_multiply end
-function backend_ntt_transform end  # Number Theoretic Transform for post-quantum
-function backend_polynomial_multiply end
-function backend_sampling end  # Cryptographic sampling
+# --- Backend-Specific Operations ---
+# Dispatch to backend-specific implementations (defined in extensions)
+"""
+    backend_lattice_multiply(backend::AbstractCryptoBackend, args...)
+"""
+function backend_lattice_multiply(backend::AbstractCryptoBackend, args...)
+    throw(MethodError(backend_lattice_multiply, (backend, args...)))
+end
+
+"""
+    backend_ntt_transform(backend::AbstractCryptoBackend, args...)
+"""
+function backend_ntt_transform(backend::AbstractCryptoBackend, args...)
+    throw(MethodError(backend_ntt_transform, (backend, args...)))
+end
+
+"""
+    backend_polynomial_multiply(backend::AbstractCryptoBackend, args...)
+"""
+function backend_polynomial_multiply(backend::AbstractCryptoBackend, args...)
+    throw(MethodError(backend_polynomial_multiply, (backend, args...)))
+end
+
+"""
+    backend_sampling(backend::AbstractCryptoBackend, args...)
+"""
+function backend_sampling(backend::AbstractCryptoBackend, args...)
+    throw(MethodError(backend_sampling, (backend, args...)))
+end
 
 # CPU fallback implementations
-backend_lattice_multiply(::CPUBackend, args...) = cpu_lattice_multiply(args...)
-backend_ntt_transform(::CPUBackend, args...) = cpu_ntt_transform(args...)
-backend_polynomial_multiply(::CPUBackend, args...) = cpu_polynomial_multiply(args...)
-backend_sampling(::CPUBackend, args...) = cpu_sampling(args...)
-
-# Placeholder CPU implementations (to be filled in)
-function cpu_lattice_multiply(A::AbstractMatrix, x::AbstractVector)
-    A * x  # Basic fallback
+function backend_lattice_multiply(::CPUBackend, A::AbstractMatrix, x::AbstractVector)
+    return A * x  # Basic fallback
 end
 
-function cpu_ntt_transform(poly::AbstractVector, modulus::Integer)
-    # Number Theoretic Transform - critical for post-quantum
-    # TODO: Implement efficient NTT with SIMD
-    poly  # Placeholder
+function backend_ntt_transform(::CPUBackend, poly::AbstractVector, modulus::Integer)
+    return poly  # Placeholder: Implement efficient NTT with SIMD
 end
 
-function cpu_polynomial_multiply(a::AbstractVector, b::AbstractVector, modulus::Integer)
-    # Polynomial multiplication in Z_q[x]
-    # TODO: Use NTT for O(n log n) multiplication
-    a  # Placeholder
+function backend_polynomial_multiply(::CPUBackend, a::AbstractVector, b::AbstractVector, modulus::Integer)
+    return a  # Placeholder: Use NTT for O(n log n) multiplication
 end
 
-function cpu_sampling(distribution::Symbol, params...)
-    # Cryptographic sampling (discrete Gaussian, uniform, etc.)
-    # TODO: Implement constant-time sampling
-    randn()  # Placeholder
+function backend_sampling(::CPUBackend, distribution::Symbol, params...)
+    return randn()  # Placeholder: Implement constant-time sampling
 end
 
+# --- Pretty Printing ---
 Base.show(io::IO, b::CPUBackend) = print(io, "CPUBackend($(b.simd_level), $(b.threads) threads)")
 Base.show(io::IO, b::CUDABackend) = print(io, "CUDABackend(device=$(b.device), CC=$(b.compute_capability))")
 Base.show(io::IO, b::ROCmBackend) = print(io, "ROCmBackend(device=$(b.device), arch=$(b.gcn_arch))")
 Base.show(io::IO, b::MetalBackend) = print(io, "MetalBackend(M$(b.apple_silicon_generation)$(b.has_neural_engine ? " + Neural Engine" : ""))")
 Base.show(io::IO, b::OneAPIBackend) = print(io, "OneAPIBackend($(b.device_type)$(b.has_npu ? " + NPU" : ""))")
 Base.show(io::IO, b::TPUBackend) = print(io, "TPUBackend(v$(b.version), $(b.topology))")
+
+# --- Package Extensions ---
+# Extensions should define:
+# - `cuda_available()`, `create_cuda_backend()`, etc.
+# - Backend-specific methods for `backend_lattice_multiply`, etc.

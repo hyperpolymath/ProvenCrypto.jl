@@ -226,19 +226,71 @@ end
 
 # Translation helpers (placeholders - full implementation needed)
 function translate_spec_to_idris_type(spec::String)
+    if spec == "ValidProbabilities"
+        return "∀ x, (∑ i, (model x)[i] = 1) ∧ (∀ i, (model x)[i] ≥ 0 ∧ (model x)[i] ≤ 1)"
+    elseif startswith(spec, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", spec)
+        if m !== nothing
+            low, high = m.captures
+            return "∀ x, ∀ i, (model x)[i] ≥ $low ∧ (model x)[i] ≤ $high"
+        end
+    elseif spec == "NoNaN"
+        return "∀ x, ∀ i, ¬ (is_nan (model x)[i])"
+    elseif spec == "NoInf"
+        return "∀ x, ∀ i, ¬ (is_inf (model x)[i])"
+    end
     # Parse SMT-LIB or logic spec and convert to Idris dependent type
     "(a : Nat) -> (b : Nat) -> a + b = b + a"  # Example
 end
 
 function translate_spec_to_lean(spec::String)
+    if spec == "ValidProbabilities"
+        return "∀ x, (∑ i, (model x)[i] = 1) ∧ (∀ i, (model x)[i] ≥ 0 ∧ (model x)[i] ≤ 1)"
+    elseif startswith(spec, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", spec)
+        if m !== nothing
+            low, high = m.captures
+            return "∀ x, ∀ i, (model x)[i] ≥ $low ∧ (model x)[i] ≤ $high"
+        end
+    elseif spec == "NoNaN"
+        return "∀ x, ∀ i, ¬ (is_nan (model x)[i])"
+    elseif spec == "NoInf"
+        return "∀ x, ∀ i, ¬ (is_inf (model x)[i])"
+    end
     "∀ (a b : ℕ), a + b = b + a"  # Example
 end
 
 function translate_spec_to_coq(spec::String)
+    if spec == "ValidProbabilities"
+        return "forall x, (sum (model x) = 1) /\\ (forall i, (model x) i >= 0 /\\ (model x) i <= 1)"
+    elseif startswith(spec, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", spec)
+        if m !== nothing
+            low, high = m.captures
+            return "forall x i, (model x) i >= $low /\\ (model x) i <= $high"
+        end
+    elseif spec == "NoNaN"
+        return "forall x i, ~ (is_nan ((model x) i))"
+    elseif spec == "NoInf"
+        return "forall x i, ~ (is_inf ((model x) i))"
+    end
     "forall (a b : nat), a + b = b + a"  # Example
 end
 
 function translate_spec_to_isabelle(spec::String)
+    if spec == "ValidProbabilities"
+        return "\"\\<forall>x. (\\<Sum>i. (model x) i = 1) \\<and> (\\<forall>i. (model x) i \\<ge> 0 \\<and> (model x) i \\<le> 1)\""
+    elseif startswith(spec, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", spec)
+        if m !== nothing
+            low, high = m.captures
+            return "\"\\<forall>x i. (model x) i \\<ge> $low \\<and> (model x) i \\<le> $high\""
+        end
+    elseif spec == "NoNaN"
+        return "\"\\<forall>x i. \\<not> (is_nan ((model x) i))\""
+    elseif spec == "NoInf"
+        return "\"\\<forall>x i. \\<not> (is_inf ((model x) i))\""
+    end
     "\\<forall>a b::nat. a + b = b + a"  # Example
 end
 

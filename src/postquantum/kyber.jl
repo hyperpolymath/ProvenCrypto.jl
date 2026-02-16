@@ -169,44 +169,119 @@ end
 # Helper functions (placeholders - full implementation needed)
 function kyber_gen_matrix(seed::Vector{UInt8}, k::Int, n::Int, q::Int)
     # Generate matrix A from seed using SHAKE-128
-    # TODO: Implement full matrix generation
-    rand(Int, k, n) .% q
+    A = zeros(Int, k, n)
+    for i in 1:k
+        for j in 1:n
+            # Domain separation
+            domain_sep = [UInt8(i), UInt8(j)]
+            shake128_ctx = SHA.SHAKE128_CTX()
+            SHA.update!(shake128_ctx, seed)
+            SHA.update!(shake128_ctx, domain_sep)
+            
+            # Sample 3 bytes to get a value in [0, q-1]
+            bytes = SHA.digest!(shake128_ctx)
+            val = (UInt(bytes[1]) << 16) | (UInt(bytes[2]) << 8) | UInt(bytes[3])
+            A[i, j] = val % q
+        end
+    end
+    return A
 end
 
 function kyber_sample_cbd(seed::Vector{UInt8}, k::Int, n::Int, eta::Int)
     # Centered binomial distribution sampling
-    # TODO: Implement constant-time CBD sampling
-    rand(Int, k, n) .- (eta ÷ 2)
+    # Simplified, non-constant-time implementation
+    coeffs = zeros(Int, k, n)
+    for i in 1:k
+        for j in 1:n
+            # Domain separation
+            domain_sep = [UInt8(i), UInt8(j)]
+            shake256_ctx = SHA.SHAKE256_CTX()
+            SHA.update!(shake256_ctx, seed)
+            SHA.update!(shake256_ctx, domain_sep)
+            bytes = SHA.digest!(shake256_ctx)
+            
+            a = sum(digits(bytes[1], base=2, pad=8)) + sum(digits(bytes[2], base=2, pad=8))
+            b = sum(digits(bytes[3], base=2, pad=8)) + sum(digits(bytes[4], base=2, pad=8))
+            coeffs[i, j] = a - b
+        end
+    end
+    return coeffs
 end
 
 function kyber_encode(msg::Vector{UInt8}, d::Int, q::Int)
     # Encode message bits into polynomial coefficients
-    # TODO: Implement encoding
-    zeros(Int, length(msg) * 8)
+    poly = zeros(Int, 256)
+    for i in 1:32
+        for j in 1:8
+            mask = (1 << (j - 1))
+            if (msg[i] & mask) != 0
+                poly[8 * (i - 1) + j] = (q + 1) ÷ 2
+            end
+        end
+    end
+    return poly
 end
 
 function kyber_decode(poly::Vector{Int}, d::Int, q::Int)
     # Decode polynomial coefficients to message bits
-    # TODO: Implement decoding
-    UInt8[]
+    msg = zeros(UInt8, 32)
+    for i in 1:32
+        for j in 1:8
+            t = poly[8 * (i - 1) + j]
+            t += (q + 1) ÷ 2
+            t = mod(t, q)
+            if t > q ÷ 2
+                msg[i] |= (1 << (j-1))
+            end
+        end
+    end
+    return msg
 end
 
 function kyber_compress(u::Matrix{Int}, v::Vector{Int}, du::Int, dv::Int)
     # Compress ciphertext components
-    # TODO: Implement compression
-    UInt8[]
+    # Simplified, non-constant-time implementation
+    bytes = UInt8[]
+    for x in u
+        push!(bytes, round(Int, x * (2^du) / 3329) % (2^du))
+    end
+    for x in v
+        push!(bytes, round(Int, x * (2^dv) / 3329) % (2^dv))
+    end
+    return bytes
 end
 
 function kyber_decompress(c::Vector{UInt8}, du::Int, dv::Int, k::Int, n::Int)
     # Decompress ciphertext
-    # TODO: Implement decompression
-    (zeros(Int, k, n), zeros(Int, n))
+    # Simplified, non-constant-time implementation
+    u = zeros(Int, k, n)
+    v = zeros(Int, n)
+    
+    idx = 1
+    for i in 1:k
+        for j in 1:n
+            u[i, j] = round(Int, c[idx] * 3329 / (2^du))
+            idx += 1
+        end
+    end
+    
+    for i in 1:n
+        v[i] = round(Int, c[idx] * 3329 / (2^dv))
+        idx += 1
+    end
+    
+    return (u, v)
 end
 
 function encode_pk(pk::KyberPublicKey)
     # Serialize public key
-    # TODO: Implement serialization
-    UInt8[]
+    # Simplified, non-constant-time implementation
+    bytes = UInt8[]
+    for x in pk.t
+        append!(bytes, reinterpret(UInt8, [Int16(x)]))
+    end
+    append!(bytes, pk.rho)
+    return bytes
 end
 
 # Stub for NTT inverse (implemented in backends/hardware.jl)

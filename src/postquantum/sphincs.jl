@@ -150,36 +150,87 @@ end
 # Helper functions (placeholders - full implementation needed)
 function sphincs_compute_root(sk_seed::Vector{UInt8}, pk_seed::Vector{UInt8}, params)
     # Compute Merkle hypertree root
-    rand(UInt8, params.n)  # Placeholder
+    # This is a simplified version, a full implementation would be much more complex
+    
+    # Generate WOTS+ private keys for all leaves
+    wots_priv_keys = [hash_blake3(vcat(sk_seed, [i])) for i in 1:2^params.h]
+    
+    # Generate WOTS+ public keys
+    wots_pub_keys = [hash_blake3(vcat(pk_seed, wots_priv_key)) for wots_priv_key in wots_priv_keys]
+    
+    # Build Merkle tree on top of WOTS+ public keys
+    tree = wots_pub_keys
+    while length(tree) > 1
+        next_level = []
+        for i in 1:2:length(tree)
+            push!(next_level, hash_blake3(vcat(tree[i], tree[i+1])))
+        end
+        tree = next_level
+    end
+    
+    return tree[1]
 end
 
 function sphincs_parse_digest(digest::Vector{UInt8}, params)
     # Extract tree and leaf indices from digest
-    (0, 0)  # Placeholder
+    # Simplified version
+    tree_index = UInt(digest[1])
+    leaf_index = UInt(digest[2])
+    return (tree_index, leaf_index)
 end
 
 function sphincs_fors_sign(msg::Vector{UInt8}, sk_seed::Vector{UInt8},
                            pk_seed::Vector{UInt8}, tree_idx::Int, params)
     # FORS (Forest of Random Subsets) signature
-    UInt8[]  # Placeholder
+    # Simplified version
+    
+    # Derive FORS private key from sk_seed and tree_idx
+    fors_priv_key = hash_blake3(vcat(sk_seed, [tree_idx]))
+    
+    # Generate FORS public key
+    fors_pub_key = hash_blake3(vcat(pk_seed, fors_priv_key))
+    
+    # "Sign" the message by revealing a subset of the private key
+    # In a real implementation, this would be based on the message hash
+    return vcat(fors_priv_key[1:16], fors_pub_key)
 end
 
 function sphincs_fors_verify(msg::Vector{UInt8}, sig::Vector{UInt8},
                              pk_seed::Vector{UInt8}, tree_idx::Int, params)
     # Verify FORS and return root
-    UInt8[]  # Placeholder
+    # Simplified version
+    
+    # Re-generate FORS public key
+    fors_priv_key_part = sig[1:16]
+    fors_pub_key = sig[17:end]
+    
+    # In a real implementation, we would use the message hash to select which
+    # parts of the private key to reveal, and then re-generate the public key
+    # from the revealed parts.
+    
+    return fors_pub_key
 end
 
 function sphincs_ht_sign(fors_root::Vector{UInt8}, sk_seed::Vector{UInt8},
                         pk_seed::Vector{UInt8}, tree_idx::Int,
                         leaf_idx::Int, params)
     # HyperTree signature (WOTS+ chain)
-    UInt8[]  # Placeholder
+    # Simplified version
+    
+    # In a real implementation, this would be the authentication path
+    # from the leaf to the root of the Merkle tree.
+    
+    return repeat(fors_root, params.h)
 end
 
 function sphincs_ht_verify(fors_root::Vector{UInt8}, sig::Vector{UInt8},
                            pk_seed::Vector{UInt8}, tree_idx::Int,
                            leaf_idx::Int, params)
     # Verify HyperTree and return root
-    UInt8[]  # Placeholder
+    # Simplified version
+    
+    # In a real implementation, we would use the authentication path
+    # to reconstruct the root of the Merkle tree.
+    
+    return sig[end-params.n+1:end]
 end

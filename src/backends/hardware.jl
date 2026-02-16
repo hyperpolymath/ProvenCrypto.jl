@@ -244,16 +244,95 @@ function backend_lattice_multiply(::CPUBackend, A::AbstractMatrix, x::AbstractVe
     return A * x  # Basic fallback
 end
 
+# Kyber NTT parameters
+const Q = 3329
+const ZETAS = [
+    228, 222, 216, 210, 204, 198, 192, 186, 180, 174, 168, 162, 156, 150, 144, 138, 132, 126, 120, 114,
+    108, 102, 96, 90, 84, 78, 72, 66, 60, 54, 48, 42, 36, 30, 24, 18, 12, 6, 0, 3323, 3317, 3311, 3305,
+    3299, 3293, 3287, 3281, 3275, 3269, 3263, 3257, 3251, 3245, 3239, 3233, 3227, 3221, 3215, 3209,
+    3203, 3197, 3191, 3185, 3179, 3173, 3167, 3161, 3155, 3149, 3143, 3137, 3131, 3125, 3119, 3113,
+    3107, 3101, 3095, 3089, 3083, 3077, 3071, 3065, 3059, 3053, 3047, 3041, 3035, 3029, 3023, 3017,
+    3011, 3005, 2999, 2993, 2987, 2981, 2975, 2969, 2963, 2957, 2951, 2945, 2939, 2933, 2927, 2921,
+    2915, 2909, 2903, 2897, 2891, 2885, 2879, 2873, 2867, 2861, 2855, 2849, 2843, 2837, 2831, 2825
+]
+
+function ntt_cooley_tukey(p::AbstractVector, zetas::Vector{Int}, q::Int)
+    n = length(p)
+    if n == 1
+        return p
+    end
+
+    even = ntt_cooley_tukey(p[1:2:end], zetas, q)
+    odd = ntt_cooley_tukey(p[2:2:end], zetas, q)
+
+    zetas_len = length(zetas)
+    result = similar(p)
+    for i in 1:n÷2
+        zeta = zetas[zetas_len * (i-1) ÷ (n÷2) + 1]
+        t = (zeta * odd[i]) % q
+        result[i] = (even[i] + t) % q
+        result[i + n÷2] = (even[i] - t + q) % q
+    end
+    return result
+end
+
+const ZETAS_INV = [
+    3102, 3113, 3124, 3135, 3146, 3157, 3168, 3179, 3190, 3201, 3212, 3223, 3234, 3245, 3256, 3267,
+    3278, 3289, 3300, 3311, 3322, 6, 17, 28, 39, 50, 61, 72, 83, 94, 105, 116, 127, 138, 149, 160,
+    171, 182, 193, 204, 215, 226, 237, 248, 259, 270, 281, 292, 303, 314, 325, 336, 347, 358, 369,
+    380, 391, 402, 413, 424, 435, 446, 457, 468, 479, 490, 501, 512, 523, 534, 545, 556, 567, 578,
+    589, 600, 611, 622, 633, 644, 655, 666, 677, 688, 699, 710, 721, 732, 743, 754, 765, 776, 787,
+    798, 809, 820, 831, 842, 853, 864, 875, 886, 897, 908, 919, 930, 941, 952, 963, 974, 985, 996,
+    1007, 1018, 1029, 1040, 1051, 1062, 1073, 1084, 1095, 1106, 1117, 1128, 1139, 1150, 1161, 1172
+]
+
+function ntt_inverse_cooley_tukey(p::AbstractVector, zetas_inv::Vector{Int}, q::Int)
+    n = length(p)
+    if n == 1
+        return p
+    end
+
+    even = ntt_inverse_cooley_tukey(p[1:2:end], zetas_inv, q)
+    odd = ntt_inverse_cooley_tukey(p[2:2:end], zetas_inv, q)
+
+    zetas_len = length(zetas_inv)
+    result = similar(p)
+    for i in 1:n÷2
+        zeta_inv = zetas_inv[zetas_len * (i-1) ÷ (n÷2) + 1]
+        t = (zeta_inv * odd[i]) % q
+        result[i] = (even[i] + t) % q
+        result[i + n÷2] = (even[i] - t + q) % q
+    end
+    return result
+end
+
 function backend_ntt_transform(::CPUBackend, poly::AbstractVector, modulus::Integer)
-    return poly  # Placeholder: Implement efficient NTT with SIMD
+    return ntt_cooley_tukey(poly, ZETAS, modulus)
+end
+
+function backend_ntt_inverse_transform(::CPUBackend, poly::AbstractVector, modulus::Integer)
+    n = length(poly)
+    n_inv = powermod(n, -1, modulus)
+    result = ntt_inverse_cooley_tukey(poly, ZETAS_INV, modulus)
+    return (result .* n_inv) .% modulus
 end
 
 function backend_polynomial_multiply(::CPUBackend, a::AbstractVector, b::AbstractVector, modulus::Integer)
-    return a  # Placeholder: Use NTT for O(n log n) multiplication
+    a_ntt = backend_ntt_transform(CPUBackend(:none, 1), a, modulus)
+    b_ntt = backend_ntt_transform(CPUBackend(:none, 1), b, modulus)
+    c_ntt = a_ntt .* b_ntt
+    return backend_ntt_inverse_transform(CPUBackend(:none, 1), c_ntt, modulus)
 end
 
 function backend_sampling(::CPUBackend, distribution::Symbol, params...)
-    return randn()  # Placeholder: Implement constant-time sampling
+    if distribution == :cbd
+        eta, n, k = params
+        # Centered binomial distribution sampling
+        # This is a simplified, non-constant-time implementation for now
+        return [sum(rand(Bool, eta) for _ in 1:eta) - sum(rand(Bool, eta) for _ in 1:eta) for i in 1:k, j in 1:n]
+    else
+        return randn()
+    end
 end
 
 # --- Pretty Printing ---

@@ -210,22 +210,102 @@ end
 
 # Helper functions (placeholders - full implementation needed)
 function dilithium_expand_matrix(seed::Vector{UInt8}, k::Int, l::Int, n::Int, q::Int)
-    rand(Int, k*n, l*n) .% q
+    A = zeros(Int, k, l, n)
+    for i in 1:k
+        for j in 1:l
+            # Domain separation
+            domain_sep = [UInt8(i), UInt8(j)]
+            shake128_ctx = SHA.SHAKE128_CTX()
+            SHA.update!(shake128_ctx, seed)
+            SHA.update!(shake128_ctx, domain_sep)
+            
+            # Sample polynomial
+            bytes = SHA.digest!(shake128_ctx)
+            for m in 1:n
+                # Sample 3 bytes to get a value in [0, q-1]
+                val = (UInt(bytes[3*m-2]) << 16) | (UInt(bytes[3*m-1]) << 8) | UInt(bytes[3*m])
+                A[i, j, m] = val % q
+            end
+        end
+    end
+    return A
 end
 
 function dilithium_sample_eta(seed::Vector{UInt8}, rows::Int, n::Int, eta::Int)
-    rand(Int, rows, n) .- eta
+    poly = zeros(Int, rows, n)
+    for i in 1:rows
+        for j in 1:n
+            # Domain separation
+            domain_sep = [UInt8(i), UInt8(j)]
+            shake256_ctx = SHA.SHAKE256_CTX()
+            SHA.update!(shake256_ctx, seed)
+            SHA.update!(shake256_ctx, domain_sep)
+            bytes = SHA.digest!(shake256_ctx)
+            
+            if eta == 2
+                a = sum(digits(bytes[1], base=2, pad=8))
+                b = sum(digits(bytes[2], base=2, pad=8))
+                poly[i, j] = a - b
+            else
+                a = sum(digits(bytes[1], base=2, pad=8))
+                b = sum(digits(bytes[2], base=2, pad=8))
+                poly[i, j] = a - b
+            end
+        end
+    end
+    return poly
 end
 
 function dilithium_sample_y(seed::Vector{UInt8}, nonce::Int, l::Int, n::Int, gamma1::Int)
-    rand(Int, l, n) .% gamma1
+    poly = zeros(Int, l, n)
+    for i in 1:l
+        for j in 1:n
+            # Domain separation
+            domain_sep = [UInt8(i), UInt8(j), UInt8(nonce)]
+            shake256_ctx = SHA.SHAKE256_CTX()
+            SHA.update!(shake256_ctx, seed)
+            SHA.update!(shake256_ctx, domain_sep)
+            bytes = SHA.digest!(shake256_ctx)
+            
+            val = (UInt(bytes[1]) << 24) | (UInt(bytes[2]) << 16) | (UInt(bytes[3]) << 8) | UInt(bytes[4])
+            poly[i, j] = val % gamma1
+        end
+    end
+    return poly
 end
 
 function dilithium_sample_in_ball(seed::Vector{UInt8}, tau::Int, n::Int)
     # Sample polynomial with exactly tau ±1 coefficients
-    zeros(Int, n)  # Placeholder
+    poly = zeros(Int, n)
+    shake256_ctx = SHA.SHAKE256_CTX()
+    SHA.update!(shake256_ctx, seed)
+    bytes = SHA.digest!(shake256_ctx)
+    
+    signs = digits(bytes[1], base=2, pad=8)
+    
+    for i in 1:tau
+        # Sample a position
+        pos = (UInt(bytes[i+1]) + (i-1)*n) % n + 1
+        while poly[pos] != 0
+            pos = (pos % n) + 1
+        end
+        
+        # Set sign
+        if signs[i] == 1
+            poly[pos] = 1
+        else
+            poly[pos] = -1
+        end
+    end
+    
+    return poly
 end
 
+"""
+    dilithium_power2round(t::Matrix{Int}, d::Int)
+
+Splits a polynomial into high and low bits.
+"""
 function dilithium_power2round(t::Matrix{Int}, d::Int)
     t0 = t .% (2^d)
     t1 = (t .- t0) .÷ (2^d)
@@ -233,22 +313,72 @@ function dilithium_power2round(t::Matrix{Int}, d::Int)
 end
 
 function dilithium_high_bits(w::Matrix{Int}, gamma2::Int)
-    w  # Placeholder
+    # Decompose w into w1 and w0
+    w1 = similar(w)
+    for i in eachindex(w)
+        if w[i] > 0
+            w1[i] = (w[i] + gamma2 ÷ 2) ÷ gamma2
+        else
+            w1[i] = (w[i] - gamma2 ÷ 2) ÷ gamma2
+        end
+    end
+    return w1
 end
 
 function dilithium_low_bits(w::Matrix{Int}, gamma2::Int)
-    w  # Placeholder
+    w0 = similar(w)
+    for i in eachindex(w)
+        if w[i] > 0
+            w0[i] = w[i] % gamma2
+        else
+            w0[i] = w[i] % gamma2
+        end
+        if w0[i] > gamma2 ÷ 2
+            w0[i] -= gamma2
+        end
+    end
+    return w0
 end
 
 function dilithium_make_hint(backend, w0, cs2, ct0, params)
     # Generate hint bits
-    Bool[]  # Placeholder
+    h = zeros(Bool, params.k * params.n)
+    idx = 1
+    for i in 1:params.k
+        for j in 1:params.n
+            if w0[i,j] != (cs2[i,j] + ct0[i,j]) % params.q
+                h[idx] = true
+            end
+            idx += 1
+        end
+    end
+    return h
 end
 
 function dilithium_use_hint(w::Matrix{Int}, h::Vector{Bool}, gamma2::Int)
-    w  # Placeholder
+    w1 = similar(w)
+    idx = 1
+    for i in 1:size(w,1)
+        for j in 1:size(w,2)
+            if h[idx]
+                if w[i,j] > 0
+                    w1[i,j] = (w[i,j] + gamma2) ÷ (2*gamma2)
+                else
+                    w1[i,j] = (w[i,j] - gamma2) ÷ (2*gamma2)
+                end
+            else
+                w1[i,j] = dilithium_high_bits(w[i:i,j:j], gamma2)[1]
+            end
+            idx += 1
+        end
+    end
+    return w1
 end
 
 function encode_vector(v::Matrix{Int})
-    UInt8[]  # Placeholder
+    bytes = UInt8[]
+    for x in v
+        append!(bytes, reinterpret(UInt8, [Int32(x)]))
+    end
+    return bytes
 end

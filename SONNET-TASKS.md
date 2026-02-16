@@ -32,7 +32,7 @@ tests reference it, and template placeholders `{{PROJECT}}` are never replaced i
 5. Constant-time operations are required where noted. Using `rand()` as a placeholder
    for cryptographic sampling is a security vulnerability.
 6. The ABI/FFI files (Idris, Zig) are RSR template boilerplate -- they still have
-   `{{PROJECT}}` placeholders. Either customize them for ProvenCrypto or remove them.
+   `ProvenCrypto` placeholders. Either customize them for ProvenCrypto or remove them.
 
 ---
 

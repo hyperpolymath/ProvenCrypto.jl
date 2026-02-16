@@ -116,6 +116,7 @@ include("verification/proof_export.jl")
 const HARDWARE_BACKEND = Ref{AbstractCryptoBackend}()
 
 function __init__()
+    init_ffi()
     HARDWARE_BACKEND[] = detect_hardware()
     @info "ProvenCrypto.jl initialized" backend=HARDWARE_BACKEND[]
 end

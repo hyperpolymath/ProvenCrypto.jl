@@ -32,7 +32,7 @@ Supports:
 - WASM/SDP environments (falls back to stdlib)
 - Standard Linux/macOS/Windows paths
 """
-function __init_libsodium__()
+function init_libsodium()
     # Platform-specific paths
     paths = if Sys.isapple()
         ["/opt/homebrew/lib/libsodium.dylib", "/usr/local/lib/libsodium.dylib"]
@@ -234,6 +234,6 @@ function kdf_argon2(
 end
 
 # --- Module Initialization ---
-function __init__()
-    __init_libsodium__()
+function init_ffi()
+    init_libsodium()
 end

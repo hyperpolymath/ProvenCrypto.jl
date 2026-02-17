@@ -1,7 +1,7 @@
 name = "ProvenCrypto"
 uuid = "33678010-b125-405f-b046-d17447b3c4c1"
 authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"

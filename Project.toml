@@ -28,7 +28,7 @@ ProvenCryptoOneAPIExt = ["oneAPI"]
 [compat]
 Dates = "1"
 JSON = "0.21, 1"
-SHA = "0.7"
+SHA = "0.7, 1"
 julia = "1.10"
 
 [extras]

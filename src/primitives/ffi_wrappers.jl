@@ -21,6 +21,8 @@ using Libdl, SHA
 
 # --- Library Handles ---
 const LIBSODIUM = Ref{Ptr{Nothing}}(C_NULL)
+const LIBSODIUM_HASH_FALLBACK_WARNED = Ref(false)
+const LIBSODIUM_KDF_FALLBACK_WARNED = Ref(false)
 
 # --- Initialization ---
 """
@@ -33,24 +35,42 @@ Supports:
 - Standard Linux/macOS/Windows paths
 """
 function init_libsodium()
-    # Platform-specific paths
-    paths = if Sys.isapple()
-        ["/opt/homebrew/lib/libsodium.dylib", "/usr/local/lib/libsodium.dylib"]
-    elseif Sys.islinux()
-        [
-            "/usr/lib/x86_64-linux-gnu/libsodium.so",
-            "/usr/lib64/libsodium.so",
-            "/usr/lib/libsodium.so",
-            "@libdir@/libsodium.so"  # OCI-standard path for rootless containers
-        ]
-    elseif Sys.iswindows()
-        ["libsodium.dll"]
-    else
-        ["libsodium.so"]
+    # Prefer dynamic linker resolution first so versioned sonames work.
+    paths = String[]
+    resolved = Libdl.find_library([
+        "sodium",
+        "libsodium",
+        "libsodium.so.26",
+        "libsodium.so.23",
+        "libsodium.so"
+    ])
+    if !isempty(resolved)
+        push!(paths, resolved)
     end
 
+    # Platform-specific paths
+    append!(
+        paths,
+        if Sys.isapple()
+            ["/opt/homebrew/lib/libsodium.dylib", "/usr/local/lib/libsodium.dylib"]
+        elseif Sys.islinux()
+            [
+                "/usr/lib/x86_64-linux-gnu/libsodium.so",
+                "/usr/lib/x86_64-linux-gnu/libsodium.so.23",
+                "/usr/lib64/libsodium.so",
+                "/usr/lib64/libsodium.so.26",
+                "/usr/lib/libsodium.so",
+                "@libdir@/libsodium.so"  # OCI-standard path for rootless containers
+            ]
+        elseif Sys.iswindows()
+            ["libsodium.dll"]
+        else
+            ["libsodium.so"]
+        end
+    )
+
     # Try each path
-    for path in paths
+    for path in unique(paths)
         try
             LIBSODIUM[] = Libdl.dlopen(path)
             @info "Loaded libsodium" path=path
@@ -175,7 +195,10 @@ Fast cryptographic hash using **BLAKE3** (or BLAKE2b fallback).
 """
 function hash_blake3(data::Vector{UInt8})
     if LIBSODIUM[] == C_NULL
-        @warn "libsodium unavailable, falling back to SHA-256 (stdlib)"
+        if !LIBSODIUM_HASH_FALLBACK_WARNED[]
+            @warn "libsodium unavailable, falling back to SHA-256 (stdlib)"
+            LIBSODIUM_HASH_FALLBACK_WARNED[] = true
+        end
         return SHA.sha256(data)  # Insecure for production; WASM-only
     end
 
@@ -214,7 +237,10 @@ function kdf_argon2(
     @assert length(salt) >= 16 "Salt must be at least 16 bytes"
 
     if LIBSODIUM[] == C_NULL
-        @warn "Argon2 unavailable, using PBKDF2 fallback (insecure for production)"
+        if !LIBSODIUM_KDF_FALLBACK_WARNED[]
+            @warn "Argon2 unavailable, using PBKDF2 fallback (insecure for production)"
+            LIBSODIUM_KDF_FALLBACK_WARNED[] = true
+        end
         return SHA.sha256(vcat(password, salt))  # Placeholder; replace with PBKDF2
     end
 

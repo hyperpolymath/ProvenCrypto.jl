@@ -24,6 +24,9 @@ const LIBSODIUM = Ref{Ptr{Nothing}}(C_NULL)
 const LIBSODIUM_HASH_FALLBACK_WARNED = Ref(false)
 const LIBSODIUM_KDF_FALLBACK_WARNED = Ref(false)
 
+@inline _as_u8vec(data::Vector{UInt8}) = data
+@inline _as_u8vec(data::AbstractVector{UInt8}) = Vector{UInt8}(data)
+
 # --- Initialization ---
 """
     __init_libsodium__() -> Bool
@@ -142,6 +145,20 @@ function aead_encrypt(
     return ciphertext
 end
 
+function aead_encrypt(
+    key::AbstractVector{UInt8},
+    nonce::AbstractVector{UInt8},
+    plaintext::AbstractVector{UInt8},
+    additional_data::AbstractVector{UInt8}=UInt8[]
+)
+    return aead_encrypt(
+        _as_u8vec(key),
+        _as_u8vec(nonce),
+        _as_u8vec(plaintext),
+        _as_u8vec(additional_data)
+    )
+end
+
 """
     aead_decrypt(key, nonce, ciphertext, additional_data="") -> Union{Vector{UInt8}, Nothing}
 
@@ -182,6 +199,20 @@ function aead_decrypt(
     ret == 0 ? plaintext : nothing  # Constant-time rejection
 end
 
+function aead_decrypt(
+    key::AbstractVector{UInt8},
+    nonce::AbstractVector{UInt8},
+    ciphertext::AbstractVector{UInt8},
+    additional_data::AbstractVector{UInt8}=UInt8[]
+)
+    return aead_decrypt(
+        _as_u8vec(key),
+        _as_u8vec(nonce),
+        _as_u8vec(ciphertext),
+        _as_u8vec(additional_data)
+    )
+end
+
 # --- Hashing (BLAKE3 fallback to BLAKE2b) ---
 """
     hash_blake3(data) -> Vector{UInt8}
@@ -211,6 +242,8 @@ function hash_blake3(data::Vector{UInt8})
     )
     return digest
 end
+
+hash_blake3(data::AbstractVector{UInt8}) = hash_blake3(_as_u8vec(data))
 
 # --- Key Derivation (Argon2id) ---
 """
@@ -257,6 +290,24 @@ function kdf_argon2(
     )
     ret == 0 || error("Argon2 KDF failed")
     return key
+end
+
+function kdf_argon2(
+    password::AbstractVector{UInt8},
+    salt::AbstractVector{UInt8};
+    memory_kb::Int=65536,
+    iterations::Int=3,
+    parallelism::Int=4,
+    key_length::Int=32
+)
+    return kdf_argon2(
+        _as_u8vec(password),
+        _as_u8vec(salt);
+        memory_kb=memory_kb,
+        iterations=iterations,
+        parallelism=parallelism,
+        key_length=key_length
+    )
 end
 
 # --- Module Initialization ---

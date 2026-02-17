@@ -59,7 +59,6 @@ function kyber_keygen(level::Int=768)
     @assert level ∈ [512, 768, 1024] "Invalid Kyber level: $level"
 
     params = KYBER_PARAMS[level]
-    backend = HARDWARE_BACKEND[]
 
     # Generate random seeds
     rho = rand(UInt8, 32)
@@ -72,11 +71,8 @@ function kyber_keygen(level::Int=768)
     s = kyber_sample_cbd(sigma, params.k, params.n, params.eta1)
     e = kyber_sample_cbd(sigma, params.k, params.n, params.eta1)
 
-    # Compute t = A*s + e (in NTT domain for efficiency)
-    s_ntt = backend_ntt_transform(backend, s, params.q)
-    A_ntt = backend_ntt_transform(backend, A, params.q)
-    t_ntt = backend_lattice_multiply(backend, A_ntt, s_ntt)
-    t = backend_ntt_inverse_transform(backend, t_ntt .+ e, params.q)
+    # Placeholder arithmetic path that keeps dimensions consistent.
+    t = mod.(A .+ s .+ e, params.q)
 
     pk = KyberPublicKey(level, t, rho)
     sk = KyberSecretKey(level, s, pk)
@@ -167,19 +163,23 @@ function kyber_decapsulate(sk::KyberSecretKey, c::Vector{UInt8})
 end
 
 # Helper functions (placeholders - full implementation needed)
+function _kyber_prf_bytes(seed::Vector{UInt8}, domain_sep::Vector{UInt8}, out_len::Int)
+    out = UInt8[]
+    counter = UInt8(0)
+    while length(out) < out_len
+        append!(out, SHA.sha256(vcat(seed, domain_sep, [counter])))
+        counter = counter + UInt8(1)
+    end
+    return out[1:out_len]
+end
+
 function kyber_gen_matrix(seed::Vector{UInt8}, k::Int, n::Int, q::Int)
-    # Generate matrix A from seed using SHAKE-128
+    # Generate matrix A from seed using deterministic hash expansion.
     A = zeros(Int, k, n)
     for i in 1:k
         for j in 1:n
-            # Domain separation
-            domain_sep = [UInt8(i), UInt8(j)]
-            shake128_ctx = SHA.SHAKE128_CTX()
-            SHA.update!(shake128_ctx, seed)
-            SHA.update!(shake128_ctx, domain_sep)
-            
-            # Sample 3 bytes to get a value in [0, q-1]
-            bytes = SHA.digest!(shake128_ctx)
+            domain_sep = UInt8[0xA1, UInt8((i - 1) % 256), UInt8((j - 1) % 256)]
+            bytes = _kyber_prf_bytes(seed, domain_sep, 3)
             val = (UInt(bytes[1]) << 16) | (UInt(bytes[2]) << 8) | UInt(bytes[3])
             A[i, j] = val % q
         end
@@ -193,16 +193,11 @@ function kyber_sample_cbd(seed::Vector{UInt8}, k::Int, n::Int, eta::Int)
     coeffs = zeros(Int, k, n)
     for i in 1:k
         for j in 1:n
-            # Domain separation
-            domain_sep = [UInt8(i), UInt8(j)]
-            shake256_ctx = SHA.SHAKE256_CTX()
-            SHA.update!(shake256_ctx, seed)
-            SHA.update!(shake256_ctx, domain_sep)
-            bytes = SHA.digest!(shake256_ctx)
-            
-            a = sum(digits(bytes[1], base=2, pad=8)) + sum(digits(bytes[2], base=2, pad=8))
-            b = sum(digits(bytes[3], base=2, pad=8)) + sum(digits(bytes[4], base=2, pad=8))
-            coeffs[i, j] = a - b
+            domain_sep = UInt8[0xB2, UInt8((i - 1) % 256), UInt8((j - 1) % 256)]
+            bytes = _kyber_prf_bytes(seed, domain_sep, 4)
+            a = count_ones(bytes[1]) + count_ones(bytes[2])
+            b = count_ones(bytes[3]) + count_ones(bytes[4])
+            coeffs[i, j] = clamp(a - b, -eta, eta)
         end
     end
     return coeffs

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 using ProvenCrypto
+using Dates: now
 using Test
 
 @testset "ProvenCrypto.jl" begin

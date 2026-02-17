@@ -60,7 +60,6 @@ function dilithium_keygen(level::Int=3)
     @assert level ∈ [2, 3, 5] "Invalid Dilithium level: $level"
 
     params = DILITHIUM_PARAMS[level]
-    backend = HARDWARE_BACKEND[]
 
     # Generate seeds
     zeta = rand(UInt8, 32)
@@ -76,10 +75,16 @@ function dilithium_keygen(level::Int=3)
     s2 = dilithium_sample_eta(rho_prime, params.k, params.n, params.eta)
 
     # Compute t = A*s1 + s2
-    s1_ntt = backend_ntt_transform(backend, s1, params.q)
-    A_ntt = backend_ntt_transform(backend, A, params.q)
-    t_ntt = backend_lattice_multiply(backend, A_ntt, s1_ntt)
-    t = backend_ntt_inverse_transform(backend, t_ntt, params.q) .+ s2
+    t = zeros(Int, params.k, params.n)
+    for i in 1:params.k
+        for j in 1:params.n
+            acc = 0
+            for ell in 1:params.l
+                acc += A[i, ell, j] * s1[ell, j]
+            end
+            t[i, j] = mod(acc + s2[i, j], params.q)
+        end
+    end
 
     # Power2Round: split t into t0 (low bits) and t1 (high bits)
     (t0, t1) = dilithium_power2round(t, params.d)
@@ -209,21 +214,27 @@ function dilithium_verify(pk::DilithiumPublicKey, message::Vector{UInt8},
 end
 
 # Helper functions (placeholders - full implementation needed)
+function _dilithium_prf_bytes(seed::Vector{UInt8}, domain_sep::Vector{UInt8}, out_len::Int)
+    out = UInt8[]
+    counter = UInt8(0)
+    while length(out) < out_len
+        append!(out, SHA.sha256(vcat(seed, domain_sep, [counter])))
+        counter = counter + UInt8(1)
+    end
+    return out[1:out_len]
+end
+
 function dilithium_expand_matrix(seed::Vector{UInt8}, k::Int, l::Int, n::Int, q::Int)
     A = zeros(Int, k, l, n)
     for i in 1:k
         for j in 1:l
-            # Domain separation
-            domain_sep = [UInt8(i), UInt8(j)]
-            shake128_ctx = SHA.SHAKE128_CTX()
-            SHA.update!(shake128_ctx, seed)
-            SHA.update!(shake128_ctx, domain_sep)
-            
-            # Sample polynomial
-            bytes = SHA.digest!(shake128_ctx)
+            domain_sep = UInt8[0xC3, UInt8((i - 1) % 256), UInt8((j - 1) % 256)]
+            bytes = _dilithium_prf_bytes(seed, domain_sep, 3 * n)
             for m in 1:n
-                # Sample 3 bytes to get a value in [0, q-1]
-                val = (UInt(bytes[3*m-2]) << 16) | (UInt(bytes[3*m-1]) << 8) | UInt(bytes[3*m])
+                offset = 3 * (m - 1)
+                val = (UInt(bytes[offset + 1]) << 16) |
+                      (UInt(bytes[offset + 2]) << 8) |
+                      UInt(bytes[offset + 3])
                 A[i, j, m] = val % q
             end
         end
@@ -235,22 +246,11 @@ function dilithium_sample_eta(seed::Vector{UInt8}, rows::Int, n::Int, eta::Int)
     poly = zeros(Int, rows, n)
     for i in 1:rows
         for j in 1:n
-            # Domain separation
-            domain_sep = [UInt8(i), UInt8(j)]
-            shake256_ctx = SHA.SHAKE256_CTX()
-            SHA.update!(shake256_ctx, seed)
-            SHA.update!(shake256_ctx, domain_sep)
-            bytes = SHA.digest!(shake256_ctx)
-            
-            if eta == 2
-                a = sum(digits(bytes[1], base=2, pad=8))
-                b = sum(digits(bytes[2], base=2, pad=8))
-                poly[i, j] = a - b
-            else
-                a = sum(digits(bytes[1], base=2, pad=8))
-                b = sum(digits(bytes[2], base=2, pad=8))
-                poly[i, j] = a - b
-            end
+            domain_sep = UInt8[0xD4, UInt8((i - 1) % 256), UInt8((j - 1) % 256)]
+            bytes = _dilithium_prf_bytes(seed, domain_sep, 2)
+            a = count_ones(bytes[1])
+            b = count_ones(bytes[2])
+            poly[i, j] = clamp(a - b, -eta, eta)
         end
     end
     return poly
@@ -260,15 +260,16 @@ function dilithium_sample_y(seed::Vector{UInt8}, nonce::Int, l::Int, n::Int, gam
     poly = zeros(Int, l, n)
     for i in 1:l
         for j in 1:n
-            # Domain separation
-            domain_sep = [UInt8(i), UInt8(j), UInt8(nonce)]
-            shake256_ctx = SHA.SHAKE256_CTX()
-            SHA.update!(shake256_ctx, seed)
-            SHA.update!(shake256_ctx, domain_sep)
-            bytes = SHA.digest!(shake256_ctx)
-            
+            domain_sep = UInt8[
+                0xE5,
+                UInt8((i - 1) % 256),
+                UInt8((j - 1) % 256),
+                UInt8(nonce % 256),
+                UInt8((nonce ÷ 256) % 256)
+            ]
+            bytes = _dilithium_prf_bytes(seed, domain_sep, 4)
             val = (UInt(bytes[1]) << 24) | (UInt(bytes[2]) << 16) | (UInt(bytes[3]) << 8) | UInt(bytes[4])
-            poly[i, j] = val % gamma1
+            poly[i, j] = Int(val % UInt(gamma1))
         end
     end
     return poly
@@ -277,27 +278,20 @@ end
 function dilithium_sample_in_ball(seed::Vector{UInt8}, tau::Int, n::Int)
     # Sample polynomial with exactly tau ±1 coefficients
     poly = zeros(Int, n)
-    shake256_ctx = SHA.SHAKE256_CTX()
-    SHA.update!(shake256_ctx, seed)
-    bytes = SHA.digest!(shake256_ctx)
-    
-    signs = digits(bytes[1], base=2, pad=8)
-    
+    bytes = _dilithium_prf_bytes(seed, UInt8[0xF6], tau + 8)
+
     for i in 1:tau
         # Sample a position
-        pos = (UInt(bytes[i+1]) + (i-1)*n) % n + 1
+        pos = (Int(bytes[i + 1]) + i - 1) % n + 1
         while poly[pos] != 0
             pos = (pos % n) + 1
         end
-        
-        # Set sign
-        if signs[i] == 1
-            poly[pos] = 1
-        else
-            poly[pos] = -1
-        end
+
+        sign_byte = bytes[1 + ((i - 1) % 8)]
+        sign_bit = (sign_byte >> ((i - 1) % 8)) & 0x01
+        poly[pos] = sign_bit == 0x01 ? 1 : -1
     end
-    
+
     return poly
 end
 

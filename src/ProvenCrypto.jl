@@ -59,6 +59,9 @@ using Statistics
 export AbstractCryptoBackend,
        CPUBackend,
        detect_hardware,
+       detect_simd_level,
+       detect_hardware_features,
+       HardwareFeatures,
 
        # Primitives (FFI wrappers)
        aead_encrypt,
@@ -67,12 +70,18 @@ export AbstractCryptoBackend,
        kdf_argon2,
 
        # Post-quantum
+       KyberPublicKey,
+       KyberSecretKey,
        kyber_keygen,
        kyber_encapsulate,
        kyber_decapsulate,
+       DilithiumPublicKey,
+       DilithiumSecretKey,
        dilithium_keygen,
        dilithium_sign,
        dilithium_verify,
+       SPHINCSPublicKey,
+       SPHINCSSecretKey,
        sphincs_keygen,
        sphincs_sign,
        sphincs_verify,
@@ -93,6 +102,7 @@ export AbstractCryptoBackend,
 
        # Verification
        ProofCertificate,
+       idris_inside_badge,
        export_idris,
        export_lean,
        export_coq,
@@ -100,6 +110,7 @@ export AbstractCryptoBackend,
 
 # Include core modules
 include("backends/hardware.jl")
+include("backends/advanced_hardware.jl")
 include("primitives/ffi_wrappers.jl")
 include("postquantum/kyber.jl")
 include("postquantum/dilithium.jl")

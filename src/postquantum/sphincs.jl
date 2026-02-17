@@ -149,33 +149,22 @@ end
 
 # Helper functions (placeholders - full implementation needed)
 function sphincs_compute_root(sk_seed::Vector{UInt8}, pk_seed::Vector{UInt8}, params)
-    # Compute Merkle hypertree root
-    # This is a simplified version, a full implementation would be much more complex
-    
-    # Generate WOTS+ private keys for all leaves
-    wots_priv_keys = [hash_blake3(vcat(sk_seed, [i])) for i in 1:2^params.h]
-    
-    # Generate WOTS+ public keys
-    wots_pub_keys = [hash_blake3(vcat(pk_seed, wots_priv_key)) for wots_priv_key in wots_priv_keys]
-    
-    # Build Merkle tree on top of WOTS+ public keys
-    tree = wots_pub_keys
-    while length(tree) > 1
-        next_level = []
-        for i in 1:2:length(tree)
-            push!(next_level, hash_blake3(vcat(tree[i], tree[i+1])))
-        end
-        tree = next_level
-    end
-    
-    return tree[1]
+    # Placeholder root derivation that avoids constructing an exponential tree.
+    meta = UInt8[
+        UInt8(params.n % 256),
+        UInt8(params.h % 256),
+        UInt8(params.d % 256),
+        UInt8(params.w % 256)
+    ]
+    digest = hash_blake3(vcat(UInt8[0x5A], sk_seed, pk_seed, meta))
+    return digest[1:params.n]
 end
 
 function sphincs_parse_digest(digest::Vector{UInt8}, params)
     # Extract tree and leaf indices from digest
     # Simplified version
-    tree_index = UInt(digest[1])
-    leaf_index = UInt(digest[2])
+    tree_index = Int(digest[1])
+    leaf_index = Int(digest[2])
     return (tree_index, leaf_index)
 end
 

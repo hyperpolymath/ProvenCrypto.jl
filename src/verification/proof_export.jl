@@ -106,9 +106,9 @@ function export_idris(cert::ProofCertificate, output_path::String)
     proof_name = sanitize_idris_name(cert.property) * "Proof"
     println(io, "$proof_name : $property_name")
 
-    if cert.verified && cert.證明 !== nothing
+    if cert.verified && cert.証明 !== nothing
         # Include proof witness if available
-        println(io, "$proof_name = $(cert.證明)")
+        println(io, "$proof_name = $(cert.証明)")
     else
         # Leave as hole for interactive proving
         println(io, "$proof_name = ?$(proof_name)_hole")
@@ -148,8 +148,8 @@ function export_lean(cert::ProofCertificate, output_path::String)
     println(io, "theorem $theorem_name :")
     println(io, "  $lean_statement := by")
 
-    if cert.verified && cert.證明 !== nothing
-        println(io, "  $(cert.證明)")
+    if cert.verified && cert.証明 !== nothing
+        println(io, "  $(cert.証明)")
     else
         println(io, "  sorry  -- Complete proof interactively")
     end
@@ -180,8 +180,8 @@ function export_coq(cert::ProofCertificate, output_path::String)
     println(io, "  $coq_statement.")
     println(io, "Proof.")
 
-    if cert.verified && cert.證明 !== nothing
-        println(io, "  $(cert.證明)")
+    if cert.verified && cert.証明 !== nothing
+        println(io, "  $(cert.証明)")
     else
         println(io, "  (* Complete proof here *)")
         println(io, "Admitted.")
@@ -212,7 +212,7 @@ function export_isabelle(cert::ProofCertificate, output_path::String)
     println(io, "  \"$isabelle_statement\"")
 
     if cert.verified && cert.証明 !== nothing
-        println(io, "  by $(cert.證明)")
+        println(io, "  by $(cert.証明)")
     else
         println(io, "  sorry")
     end

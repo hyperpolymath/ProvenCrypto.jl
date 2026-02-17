@@ -1,101 +1,92 @@
-= RSR template repo - see RSR_OUTLINE.adoc in root for general background and specification
+= ProvenCrypto.jl: Formally Verified Cryptographic Protocols for Julia
+:toc: macro
+:toc-title:
+:toclevels: 3
 
-== This is your repo - don't forget to rename me!
+toc::[]
 
-== ABI/FFI Standards (Hyperpolymath Universal Standard)
+== Overview
 
-**All repos with foreign function interfaces MUST follow this standard:**
+ProvenCrypto.jl provides a Julia library of *formally verified* cryptographic protocols and post-quantum primitives. This project is part of the hyperpolymath ecosystem, emphasizing mathematical proofs of correctness, security, and robustness.
 
-* **ABI (Application Binary Interface)** → **Idris2** (`src/abi/*.idr`)
-** Type definitions with dependent type proofs
-** Memory layout verification
-** Platform-specific ABIs with compile-time selection
-** Formal verification of interface correctness
+== Features
 
-* **FFI (Foreign Function Interface)** → **Zig** (`ffi/zig/src/*.zig`)
-** C-compatible function implementations
-** Zero-cost abstractions
-** Memory-safe by default
-** Cross-compilation support
+* **Formal Verification**: All cryptographic primitives are accompanied by machine-checked proofs of security properties.
+* **Post-Quantum Security**: Includes algorithms resistant to quantum computing attacks.
+* **Julia Integration**: Designed for high performance and seamless integration with the Julia scientific computing ecosystem.
+* **Interoperability**: Follows the Hyperpolymath Universal Standard for ABI/FFI, ensuring compatibility with other languages and systems.
 
-* **Generated C Headers** → Auto-generated from Idris2 ABI (`generated/abi/*.h`)
-** Bridge between Idris2 and Zig
-** Consumed by any language via C ABI
+== Directory Structure
 
-**Directory Structure:**
+[source]
 ----
-project/
-├── src/abi/          # Idris2 ABI definitions (REQUIRED)
-├── ffi/zig/          # Zig FFI implementation (REQUIRED)
-├── generated/abi/    # Auto-generated C headers
-└── bindings/         # Language-specific wrappers (optional)
+ProvenCrypto.jl/
+├── src/            # Main Julia source code
+├── proofs/         # Formal proofs (Idris2/Lean/Coq)
+├── bindings/       # Language bindings (optional)
+├── test/           # Unit and property tests
+├── docs/           # Documentation
+└── examples/       # Usage examples
 ----
 
-**See:** `ABI-FFI-README.md` for complete documentation
+== Core Components
 
-== AI CLI standards
+=== 1. Cryptographic Primitives
 
-- Include `ai-cli-crash-capture/` and `contractiles/` from this template in new repos.
-- Mirror 6SCM files into `.machine_readable/` (NOT `.machine_readable/6scm/`).
-- Before any code generation, check `/var/mnt/eclipse/repos/proven` for the current Idris "unbreakable" library status.
-- If a project uses that Idris library, add an *Idris Inside* badge to the repo.
-- If new bindings are required, add them in `/var/mnt/eclipse/repos/proven` as `idris2-zig-<language>` during the work.
-- If new code suggests additional "unbreakable" Idris modules, add them under `/var/mnt/eclipse/repos/proven` and update binders across all supported languages.
+* **Symmetric Encryption**: AES, ChaCha20 (with formal proofs)
+* **Asymmetric Encryption**: Kyber, Dilithium (post-quantum)
+* **Hash Functions**: SHA-3, BLAKE3 (with collision resistance proofs)
+* **Signatures**: Ed25519, SPHINCS+ (post-quantum)
 
-== Standard Dependencies
+=== 2. Formal Proofs
 
-=== Web Projects
+* **Correctness**: Proofs that implementations match their mathematical specifications.
+* **Security**: Proofs of resistance to known attacks (e.g., side-channel, quantum).
+* **Interoperability**: Proofs of ABI/FFI compliance for cross-language use.
 
-ReScript web projects in the hyperpolymath ecosystem **MUST** use these formally verified components:
+== Usage
 
-[cols="1,2,1"]
-|===
-|Library |Purpose |Status
+=== Installation
 
-|link:https://github.com/hyperpolymath/rescript-dom-mounter[rescript-dom-mounter]
-|Formally verified DOM mounting
-|**REQUIRED**
-
-|link:https://github.com/hyperpolymath/rescript-tea[rescript-tea]
-|TEA architecture framework
-|Recommended
-
-|link:https://github.com/hyperpolymath/cadre-tea-router[cadre-tea-router]
-|Proven-safe URL routing
-|Recommended
-
-|link:https://github.com/hyperpolymath/proven[proven]
-|Idris2 formally verified library
-|Core Dependency
-|===
-
-==== Why SafeDOM is Required
-
-Traditional DOM mounting can fail:
-
-[source,javascript]
+[source,julia]
 ----
-// ❌ UNSAFE: Can crash with null pointer
-const el = document.getElementById('app')
-el.innerHTML = html  // 💥
+using Pkg
+Pkg.add(url="https://github.com/hyperpolymath/ProvenCrypto.jl")
 ----
 
-SafeDOM provides **compile-time proofs** that DOM operations cannot fail:
+=== Example: Secure Key Exchange
 
-[source,rescript]
+[source,julia]
 ----
-// ✅ PROVEN SAFE: Mathematically guaranteed
-SafeDOM.mountSafe("#app", html,
-  ~onSuccess=el => Console.log("Success"),
-  ~onError=err => Console.error(err))
+using ProvenCrypto
+
+# Generate a post-quantum key pair
+(sk, pk) = generate_keypair(:kyber)
+
+# Encrypt/decrypt with formal guarantees
+ciphertext = encrypt(pk, "secret message")
+plaintext = decrypt(sk, ciphertext)
 ----
 
-**Mathematical Guarantees:**
+== Verification
 
-✓ No null pointer dereferences (Idris2 proof)
-✓ No invalid CSS selectors (dependent types)
-✓ No malformed HTML (balanced tag checking)
-✓ Type-safe operations (ReScript + Idris2)
-✓ Zero runtime overhead (proofs erased)
+All proofs are available in the `proofs/` directory and can be checked using:
 
-See link:https://github.com/hyperpolymath/rescript-dom-mounter[rescript-dom-mounter documentation] for full details.
+* Idris2 (for ABI/FFI correctness)
+* Lean/Coq (for cryptographic properties)
+
+== Standards Compliance
+
+* **ABI/FFI**: Follows the Hyperpolymath Universal Standard for cross-language compatibility.
+* **AI CLI**: Includes crash capture and contractile support for automated verification.
+
+== Contributing
+
+Contributions are welcome! Please ensure all new code includes:
+1. Formal proofs of correctness and security.
+2. Comprehensive tests.
+3. Documentation updates.
+
+== License
+
+MIT

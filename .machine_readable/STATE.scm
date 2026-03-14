@@ -1,4 +1,22 @@
-;; SPDX-License-Identifier: PMPL-1.0-or-later
-(state (metadata (version "0.1.0") (last-updated "2026-02-08") (status active))
-  (project-context (name "language-bridges") (purpose "FFI bridges between languages via Zig") (completion-percentage 20))
-  (components (component "ada-zig-ffi") (component "gleam-zig-ffi") (component "idris2-zig-ffi") (component "julia-zig-ffi") (component "ocaml-zig-ffi") (component "rescript-zig-ffi") (component "rust-zig-ffi") (component "swift-zig-ffi") (component "zig-c-ffi") (component "zig-container-ffi") (component "zig-fuse-ext") (component "zig-libgit2-ffi") (component "zig-nickel-ffi") (component "zig-systemd-ffi") (component "zig-wireguard")))
+;; SPDX-License-Identifier: MPL-2.0
+;; (PMPL-1.0-or-later preferred; MPL-2.0 required for Julia ecosystem)
+;; STATE.scm for ProvenCrypto.jl
+
+(state
+  (metadata
+    (version "0.1.2")
+    (last-updated "2026-03-14")
+    (status active))
+  (project-context
+    (name "ProvenCrypto.jl")
+    (purpose "Formally verified cryptographic primitives for Julia with GPU acceleration")
+    (completion-percentage 30))
+  (components
+    (component "core-crypto" "SHA, hashing, primitives")
+    (component "accelerator-gate" "GPU/coprocessor dispatch")
+    (component "zig-ffi" "Zig FFI for verified implementations")
+    (component "idris2-abi" "Formal ABI proofs"))
+  (critical-next-actions
+    (immediate "Implement core cryptographic primitives")
+    (short-term "GPU backend integration via AcceleratorGate")
+    (long-term "Formal verification of all algorithms via Idris2 ABI")))

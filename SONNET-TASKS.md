@@ -614,19 +614,19 @@ fi
 ## TASK 12: Fix SPDX License Headers (AGPL-3.0 Must Be PMPL-1.0-or-later)
 
 **Files with wrong license:**
-- `/var/mnt/eclipse/repos/ProvenCrypto.jl/examples/SafeDOMExample.res` line 1: `AGPL-3.0-or-later`
-- `/var/mnt/eclipse/repos/ProvenCrypto.jl/ffi/zig/build.zig` line 2: `AGPL-3.0-or-later`
-- `/var/mnt/eclipse/repos/ProvenCrypto.jl/ffi/zig/src/main.zig` line 6: `AGPL-3.0-or-later`
-- `/var/mnt/eclipse/repos/ProvenCrypto.jl/ffi/zig/test/integration_test.zig` line 2: `AGPL-3.0-or-later`
-- `/var/mnt/eclipse/repos/ProvenCrypto.jl/docs/CITATIONS.adoc` line 13: `license = {AGPL-3.0-or-later}`
+- `/var/mnt/eclipse/repos/ProvenCrypto.jl/examples/SafeDOMExample.res` line 1: `PMPL-1.0-or-later`
+- `/var/mnt/eclipse/repos/ProvenCrypto.jl/ffi/zig/build.zig` line 2: `PMPL-1.0-or-later`
+- `/var/mnt/eclipse/repos/ProvenCrypto.jl/ffi/zig/src/main.zig` line 6: `PMPL-1.0-or-later`
+- `/var/mnt/eclipse/repos/ProvenCrypto.jl/ffi/zig/test/integration_test.zig` line 2: `PMPL-1.0-or-later`
+- `/var/mnt/eclipse/repos/ProvenCrypto.jl/docs/CITATIONS.adoc` line 13: `license = {PMPL-1.0-or-later}`
 
 **Problem:**
 Per the CLAUDE.md license policy, hyperpolymath original code must use
 `PMPL-1.0-or-later`. AGPL-3.0 is the old license and must never be used.
 
 **What to do:**
-1. Replace all `AGPL-3.0-or-later` SPDX identifiers with `PMPL-1.0-or-later`.
-2. Update `docs/CITATIONS.adoc` BibTeX entry from `AGPL-3.0-or-later` to `PMPL-1.0-or-later`.
+1. Replace all `PMPL-1.0-or-later` SPDX identifiers with `PMPL-1.0-or-later`.
+2. Update `docs/CITATIONS.adoc` BibTeX entry from `PMPL-1.0-or-later` to `PMPL-1.0-or-later`.
 
 **Verification:**
 ```bash

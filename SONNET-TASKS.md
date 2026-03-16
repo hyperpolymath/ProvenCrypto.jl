@@ -593,9 +593,9 @@ a nonexistent project name.
 **What to do:**
 1. Replace `{{PROJECT}}` with `ProvenCrypto` (capitalized, for module names and titles).
 2. Replace `{{project}}` with `provencrypto` (lowercase, for library names and C symbols).
-3. Replace `{{OWNER}}` with `hyperpolymath`.
-4. Replace `{{FORGE}}` with `github.com`.
-5. Replace `{{REPO}}` with `ProvenCrypto.jl`.
+3. Replace `hyperpolymath` with `hyperpolymath`.
+4. Replace `github.com` with `github.com`.
+5. Replace `ProvenCrypto.jl` with `ProvenCrypto.jl`.
 
 **Verification:**
 ```bash

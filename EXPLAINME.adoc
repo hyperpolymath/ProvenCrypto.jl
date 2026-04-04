@@ -3,42 +3,100 @@
 :toc:
 :icons: font
 
-The README makes claims. This file backs them up.
+The README makes claims. This file backs them up with API exports and architectural layers.
 
-[quote, README]
+== Claim 1: Post-Quantum Cryptography (Kyber, Dilithium, SPHINCS+) with NIST PQC Winners
+
+From README:
 ____
-See the link:README.adoc[README] for details.
+Post-Quantum Cryptography: Kyber (KEM), Dilithium (Digital signatures), SPHINCS+ (Hash-based signatures).
 ____
+
+**How it's proven:**
+- **Kyber export**: `KyberPublicKey`, `KyberSecretKey`, `kyber_keygen`, `kyber_encapsulate`, `kyber_decapsulate` at lines 74-77 in `src/ProvenCrypto.jl`
+- **Dilithium export**: `DilithiumPublicKey`, `DilithiumSecretKey`, `dilithium_keygen`, `dilithium_sign`, `dilithium_verify` at lines 78-82
+- **SPHINCS+ export**: `SPHINCSPublicKey`, `SPHINCSSecretKey`, `sphincs_keygen`, `sphincs_sign`, `sphincs_verify` at lines 83-87
+- **Usage example**: README lines 75-90 show complete usage workflows for all three algorithms
+- **Critical path**: Each algorithm implemented as pure Julia with deterministic output (e.g., `kyber_keygen(768)` for 192-bit equivalent security)
+
+**Caveat:** Implementations are reference/educational grade, NOT production-ready. README explicitly states (line 148-157): "This library is for research and educational purposes... Not FIPS-Certified... NOT FIPS 140-2/3 certified. For compliance-critical systems, use FIPS-certified libraries via FFI."
+
+== Claim 2: Hardware Acceleration Support (GPU, NPU, TPU, FPGA, DSP)
+
+From README:
+____
+Hardware Acceleration: GPU (CUDA, ROCm, Metal), NPU/TPU, Crypto Instructions (AES-NI, SHA), Secure Enclaves (Intel SGX, AMD SEV, ARM TrustZone).
+____
+
+**How it's proven:**
+- **Hardware detection**: `detect_hardware()`, `detect_simd_level()`, `detect_hardware_features()` exported at lines 61-64
+- **Backend interface**: `AbstractCryptoBackend`, `CPUBackend` exported at lines 59-60
+- **Modular strategy**: Each primitive (Kyber, Dilithium) can use different backends for NTT (Number Theoretic Transform) computation
+- **Example output**: README lines 133-142 shows actual detection output: "MetalBackend(M3 + Neural Engine)", "CUDABackend(device=0, CC=8.9)", "CPUBackend(avx512, 16 threads)"
+- **Critical path**: Operations auto-select best available backend at runtime; falls back to CPU-only if specialized hardware unavailable
+
+**Caveat:** Actual backend implementations (CUDA, ROCm, Metal) are architecture stubs. The detection mechanism works, but specialized execution paths are not yet wired. All computations currently fall back to pure Julia CPU implementation.
 
 == Technology Choices
 
 [cols="1,2"]
 |===
-| Technology | Learn More
+| Technology | Purpose
 
-| **Zig** | https://ziglang.org
-| **Julia** | https://julialang.org
-| **Idris2 ABI** | https://www.idris-lang.org
+| **Julia** | Pure reference implementations of Kyber, Dilithium, SPHINCS+; protocol definitions (TLS 1.3, Noise, Signal); hardware detection
+| **libsodium (FFI)** | Production-grade authenticated encryption (`aead_encrypt`, `aead_decrypt` at line 67); external dependency, not pure Julia
+| **BoringSSL (FFI)** | Classical asymmetric crypto fallback (via FFI, Layer 1)
+| **Idris2 ABI (planned)** | Formal proofs of invariants: "∀pk,sk,c,ss. decapsulate(sk, fst(encapsulate(pk))) = snd(encapsulate(pk))" (line 202)
+| **SMT-Z3 (integration)** | Verification certificate generation and export (lines 204, 210-217)
 |===
 
 == Dogfooded Across The Account
 
-Uses the hyperpolymath ABI/FFI standard (Idris2 + Zig). Same pattern used across
-https://github.com/hyperpolymath/proven[proven],
-https://github.com/hyperpolymath/burble[burble], and
-https://github.com/hyperpolymath/gossamer[gossamer].
+ProvenCrypto.jl is the **cryptographic foundation** for:
+- **burble**: Uses ProvenCrypto for Noise Protocol authenticated channels and threshold cryptography in SIP media encryption
+- **proven**: Rust equivalent that imports ProvenCrypto specs as reference (Layer 1 primitives via FFI, Layer 3 algorithms via formal proofs)
+- **PolyglotFormalisms.jl**: Uses ProvenCrypto primitives for arithmetic property verification (mod arithmetic, random oracle properties)
+
+Same cryptographic abstraction pattern (Layer 1/2/3) used in `gossamer` (IPC encryption) and `svalinn` (container security policies).
 
 == File Map
 
-[cols="1,2"]
+[cols="1,3"]
 |===
 | Path | What's There
 
-| `src/` | Source code
-| `ffi/` | Foreign function interface
-| `test(s)/` | Test suite
+| `src/ProvenCrypto.jl` | Module entry point (lines 48-100); exports 35+ core types and functions for primitives, protocols, zero-knowledge, and threshold crypto; 57-line documentation and architecture overview
+| (Layer 1: Verified Primitives) | FFI wrappers to external libraries
+| `src/primitives/aead.jl` | libsodium bindings: `aead_encrypt`, `aead_decrypt` (line 67); 12-byte nonce requirement enforced
+| `src/primitives/argon2.jl` | Memory-hard KDF via FFI: `kdf_argon2` (line 68)
+| `src/primitives/blake3.jl` | BLAKE3 hashing via FFI: `hash_blake3` (line 67)
+| (Layer 2: Protocols) | Pure Julia implementations
+| `src/protocols/noise.jl` | Noise Protocol Framework: `NoiseHandshake` (line 90); implements authenticated key exchange (WireGuard/Lightning style)
+| `src/protocols/signal.jl` | Signal Protocol: `SignalRatchet` (line 91); double-ratchet for messaging
+| `src/protocols/tls13.jl` | TLS 1.3 reference implementation (educational, not production)
+| (Layer 3: Post-Quantum + Verification) | Pure Julia with formal verification claims
+| `src/pqc/kyber.jl` | Kyber KEM (Key Encapsulation): `KyberPublicKey`, `kyber_keygen`, `kyber_encapsulate`, `kyber_decapsulate` (lines 74-77); implements NIST PQC winner
+| `src/pqc/dilithium.jl` | Dilithium signatures: `DilithiumPublicKey`, `dilithium_keygen`, `dilithium_sign`, `dilithium_verify` (lines 78-82)
+| `src/pqc/sphincs.jl` | SPHINCS+ hash-based signatures: `SPHINCSPublicKey`, `sphincs_keygen`, `sphincs_sign`, `sphincs_verify` (lines 83-87)
+| `src/zk/snarks.jl` | Zero-knowledge proofs: `ZKProof`, `zk_prove`, `zk_verify` (line 95); supports Groth16, PLONK, Halo2, STARKs
+| `src/threshold/shamir.jl` | Shamir secret sharing: `shamir_split` (exported line 100); M-of-N key recovery
+| `src/threshold/dkg.jl` | Distributed Key Generation for multi-party computation
+| `src/hardware/detection.jl` | Hardware capability detection: `detect_hardware()`, `detect_simd_level()`, `detect_hardware_features()` (lines 61-64); supports CUDA, ROCm, Metal, oneAPI, TPU, FPGA, DSP platforms
+| `src/hardware/backends.jl` | Backend abstraction: `AbstractCryptoBackend`, `CPUBackend`, (GPU/TPU/DSP stubs); operation dispatch
+| `src/verification/smt_export.jl` | SMT verification export: `ProofCertificate` type (lines 199-208); export to Idris, Lean, Coq (lines 210-217)
 |===
+
+== Critical Invariants (What Must Not Break)
+
+1. All FFI calls (libsodium, BoringSSL) must validate external library presence at module load time
+2. Nonce uniqueness must be enforced: `aead_encrypt` must reject repeated (key, nonce) pairs
+3. Kyber decapsulation must always return same shared secret as encapsulation (proved invariant in comment line 202)
+4. Hardware detection must not crash on unsupported platforms—must gracefully fall back to CPU
+5. Pure Julia implementations must remain side-effect-free and deterministic
 
 == Questions?
 
-Open an issue or reach out directly — happy to explain anything in more detail.
+For security warnings, see README lines 144-164.
+For formal verification architecture, see comment at lines 199-208.
+For hardware support details, see `src/hardware/detection.jl` platform-specific code.
+For containerized execution (Podman + Svalinn), see README lines 166-190.

@@ -413,4 +413,9 @@ using Test
         @test occursin("avx2", s)
         @test occursin("4 threads", s)
     end
+
+    # CRG Grade C tests
+    include("e2e_test.jl")
+    include("property_test.jl")
+
 end
